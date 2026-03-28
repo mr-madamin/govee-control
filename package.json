@@ -1,0 +1,23 @@
+{
+  "name": "govee_control",
+  "version": "1.0.0",
+  "description": "Dashboard to control Govee lights",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mr-madamin/govee-control.git"
+  },
+  "author": "Daler",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mr-madamin/govee-control/issues"
+  },
+  "homepage": "https://github.com/mr-madamin/govee-control#readme",
+  "devDependencies": {
+    "electron": "^41.1.0"
+  }
+}
