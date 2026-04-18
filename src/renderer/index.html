@@ -1,20 +1,61 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'"
-    />
-    <meta
-      http-equiv="X-Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self'"
     />
     <title>Govee Control</title>
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <h1>This is what you see!</h1>
-    <div id="info"></div>
+
+    <!-- API Key Setup Overlay -->
+    <div id="setup-overlay">
+      <div class="setup-card">
+        <h2>Govee Control</h2>
+        <p>Enter your Govee API key to get started.</p>
+        <input type="password" id="api-key-input" placeholder="Govee API Key" autocomplete="off" />
+        <button id="save-api-key-btn">Save Key</button>
+        <p id="setup-error" class="error hidden"></p>
+      </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="hidden">
+      <aside id="sidebar">
+        <h2>Presets</h2>
+        <ul id="preset-list"></ul>
+
+        <div id="new-preset-form">
+          <input type="text" id="preset-name-input" placeholder="Preset name" maxlength="30" />
+          <input type="color" id="preset-color-input" value="#ffffff" title="Pick preset color" />
+          <button id="add-preset-btn">Add</button>
+        </div>
+        <p id="preset-error" class="error hidden"></p>
+
+        <div class="sidebar-footer">
+          <button id="settings-btn" class="ghost-btn">API Key Settings</button>
+        </div>
+      </aside>
+
+      <main id="main-area">
+        <header id="main-header">
+          <h1>Devices</h1>
+          <button id="refresh-btn">Refresh</button>
+        </header>
+
+        <div id="error-banner" class="hidden">
+          <span id="error-banner-text"></span>
+          <button id="error-banner-dismiss">✕</button>
+        </div>
+
+        <div id="device-cards-container"></div>
+        <p id="loading-indicator">Loading devices…</p>
+      </main>
+    </div>
+
     <script src="./renderer.js"></script>
   </body>
 </html>
