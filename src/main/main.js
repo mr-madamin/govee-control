@@ -65,7 +65,7 @@ async function goveeGetDevices(apiKey) {
   }
   const body = await res.json();
   console.log(body);
-  return body.data;
+  return body.data.filter((d) => d.type === "devices.types.light");
 }
 
 async function goveeSetColor(apiKey, device, model, r, g, b) {
