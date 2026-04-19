@@ -64,7 +64,7 @@ async function goveeGetDevices(apiKey) {
     throw new Error(body.message || `HTTP ${res.status}`);
   }
   const body = await res.json();
-  console.log(body);
+  fs.writeFileSync("/tmp/govee-devices.json", JSON.stringify(body.data, null, 2));
   return body.data.filter((d) => d.type === "devices.types.light");
 }
 

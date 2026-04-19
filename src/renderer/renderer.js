@@ -109,48 +109,140 @@ async function loadDevices() {
   res.devices.forEach((device) => deviceContainer.appendChild(renderDeviceCard(device)));
 }
 
+const SUPPORTED_CAPABILITIES = [
+  "colorRgb",
+  "colorTemperatureK",
+  "brightness",
+  "segmentedColorRgb",
+];
+
+function hasCap(capabilities, instance) {
+  return capabilities.some((c) => c.instance === instance);
+}
+
+function capParams(capabilities, instance) {
+  const cap = capabilities.find((c) => c.instance === instance);
+  return cap ? cap.parameters : null;
+}
+
+function intToHex(int) {
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  return rgbToHex(r, g, b);
+}
+
 function renderDeviceCard(device) {
+  const caps = device.capabilities || [];
+  const supportedCaps = caps.filter((c) => SUPPORTED_CAPABILITIES.includes(c.instance));
+
   const card = document.createElement("div");
   card.className = "device-card";
 
+  // Header
   const name = document.createElement("h3");
   name.textContent = device.deviceName;
 
   const model = document.createElement("p");
   model.className = "device-model";
-  model.textContent = device.model;
+  model.textContent = device.sku;
 
-  const colorPicker = document.createElement("input");
-  colorPicker.type = "color";
-  colorPicker.value = "#ffffff";
-  colorPicker.title = "Pick a color";
-
-  const applyBtn = document.createElement("button");
-  applyBtn.className = "apply-color-btn";
-  applyBtn.textContent = "Apply Color";
-
-  const status = document.createElement("p");
-  status.className = "card-status";
-
-  applyBtn.addEventListener("click", async () => {
-    const { r, g, b } = hexToRgb(colorPicker.value);
-    applyBtn.disabled = true;
-    status.className = "card-status";
-    status.textContent = "Sending…";
-
-    const res = await window.govee.setColor(device.device, device.model, r, g, b);
-    applyBtn.disabled = false;
-
-    if (res.ok) {
-      status.textContent = "Applied!";
-      setTimeout(() => { status.textContent = ""; }, 2000);
-    } else {
-      status.className = "card-status err";
-      status.textContent = res.error || "Error";
-    }
+  // Capability tags
+  const tags = document.createElement("div");
+  tags.className = "cap-tags";
+  supportedCaps.forEach((c) => {
+    const tag = document.createElement("span");
+    tag.className = "cap-tag";
+    tag.textContent = c.instance;
+    tags.appendChild(tag);
   });
+  if (hasCap(caps, "segmentedColorRgb")) {
+    const badge = document.createElement("span");
+    badge.className = "cap-tag cap-tag--multi";
+    badge.textContent = "multi-zone";
+    tags.appendChild(badge);
+  }
 
-  card.append(name, model, colorPicker, applyBtn, status);
+  card.append(name, model, tags);
+
+  // Color picker — shown whenever colorRgb is supported
+  if (hasCap(caps, "colorRgb")) {
+    const swatchRow = document.createElement("div");
+    swatchRow.className = "swatch-row";
+
+    const swatchLabel = document.createElement("span");
+    swatchLabel.className = "swatch-label";
+    swatchLabel.textContent = "Color";
+
+    const swatch = document.createElement("span");
+    swatch.className = "color-swatch-large";
+    swatch.style.backgroundColor = "#ffffff";
+
+    const swatchHex = document.createElement("span");
+    swatchHex.className = "swatch-hex";
+    swatchHex.textContent = "#ffffff";
+
+    swatchRow.append(swatchLabel, swatch, swatchHex);
+
+    const colorPicker = document.createElement("input");
+    colorPicker.type = "color";
+    colorPicker.value = "#ffffff";
+    colorPicker.title = "Pick a color";
+
+    // Keep swatch in sync as user drags the picker
+    colorPicker.addEventListener("input", () => {
+      swatch.style.backgroundColor = colorPicker.value;
+      swatchHex.textContent = colorPicker.value;
+    });
+
+    const applyBtn = document.createElement("button");
+    applyBtn.className = "apply-color-btn";
+    applyBtn.textContent = "Apply Color";
+
+    const status = document.createElement("p");
+    status.className = "card-status";
+
+    applyBtn.addEventListener("click", async () => {
+      const { r, g, b } = hexToRgb(colorPicker.value);
+      applyBtn.disabled = true;
+      status.className = "card-status";
+      status.textContent = "Sending…";
+
+      const res = await window.govee.setColor(device.device, device.sku, r, g, b);
+      applyBtn.disabled = false;
+
+      if (res.ok) {
+        status.textContent = "Applied!";
+        setTimeout(() => { status.textContent = ""; }, 2000);
+      } else {
+        status.className = "card-status err";
+        status.textContent = res.error || "Error";
+      }
+    });
+
+    card.append(swatchRow, colorPicker, applyBtn, status);
+  }
+
+  // Brightness range info
+  if (hasCap(caps, "brightness")) {
+    const params = capParams(caps, "brightness");
+    const range = params?.range;
+    const row = document.createElement("div");
+    row.className = "state-row";
+    row.innerHTML = `<span class="state-label">Brightness</span><span class="state-value">${range ? `${range.min}–${range.max}%` : "supported"}</span>`;
+    card.appendChild(row);
+  }
+
+  // Color temperature range info
+  if (hasCap(caps, "colorTemperatureK")) {
+    const params = capParams(caps, "colorTemperatureK");
+    const range = params?.range;
+    const row = document.createElement("div");
+    row.className = "state-row";
+    row.innerHTML = `<span class="state-label">Color temp</span><span class="state-value">${range ? `${range.min}–${range.max}K` : "supported"}</span>`;
+    card.appendChild(row);
+  }
+
   return card;
 }
 

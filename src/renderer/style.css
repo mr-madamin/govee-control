@@ -245,6 +245,58 @@ body {
 
 .device-card .card-status.err { color: #e94560; }
 
+/* Capability tags */
+.cap-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.2rem;
+}
+
+.cap-tag {
+  font-size: 0.68rem;
+  background: #1a4a80;
+  color: #7eb8f7;
+  border-radius: 4px;
+  padding: 0.15rem 0.45rem;
+  white-space: nowrap;
+}
+
+.cap-tag--multi {
+  background: #2a1a60;
+  color: #b07ef7;
+}
+
+/* Current color swatch row */
+.swatch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.swatch-label { color: #888; }
+
+.color-swatch-large {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
+}
+
+.swatch-hex { color: #aaa; font-family: monospace; font-size: 0.75rem; }
+
+/* State rows (brightness, color temp) */
+.state-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+}
+
+.state-label { color: #888; }
+.state-value { color: #ccc; font-family: monospace; }
+
 /* ── Error banner ── */
 #error-banner {
   display: flex;
