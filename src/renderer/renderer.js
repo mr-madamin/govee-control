@@ -106,7 +106,17 @@ async function loadDevices() {
     return;
   }
 
-  res.devices.forEach((device) => deviceContainer.appendChild(renderDeviceCard(device)));
+  const cards = res.devices.map((device) => {
+    const { card, updateState } = renderDeviceCard(device);
+    deviceContainer.appendChild(card);
+    return { device, updateState };
+  });
+
+  // Fetch live state for each device in parallel
+  cards.forEach(async ({ device, updateState }) => {
+    const stateRes = await window.govee.getDeviceState(device.device, device.sku);
+    if (stateRes.ok) updateState(stateRes.capabilities);
+  });
 }
 
 const SUPPORTED_CAPABILITIES = [
@@ -165,6 +175,10 @@ function renderDeviceCard(device) {
 
   card.append(name, model, tags);
 
+  // Refs updated by updateState()
+  let swatch = null, swatchHex = null, colorPicker = null;
+  let brightnessValue = null, tempValue = null;
+
   // Color picker — shown whenever colorRgb is supported
   if (hasCap(caps, "colorRgb")) {
     const swatchRow = document.createElement("div");
@@ -174,22 +188,22 @@ function renderDeviceCard(device) {
     swatchLabel.className = "swatch-label";
     swatchLabel.textContent = "Color";
 
-    const swatch = document.createElement("span");
+    swatch = document.createElement("span");
     swatch.className = "color-swatch-large";
-    swatch.style.backgroundColor = "#ffffff";
+    swatch.style.backgroundColor = "#888";
+    swatch.title = "Loading…";
 
-    const swatchHex = document.createElement("span");
+    swatchHex = document.createElement("span");
     swatchHex.className = "swatch-hex";
-    swatchHex.textContent = "#ffffff";
+    swatchHex.textContent = "…";
 
     swatchRow.append(swatchLabel, swatch, swatchHex);
 
-    const colorPicker = document.createElement("input");
+    colorPicker = document.createElement("input");
     colorPicker.type = "color";
     colorPicker.value = "#ffffff";
     colorPicker.title = "Pick a color";
 
-    // Keep swatch in sync as user drags the picker
     colorPicker.addEventListener("input", () => {
       swatch.style.backgroundColor = colorPicker.value;
       swatchHex.textContent = colorPicker.value;
@@ -223,27 +237,60 @@ function renderDeviceCard(device) {
     card.append(swatchRow, colorPicker, applyBtn, status);
   }
 
-  // Brightness range info
+  // Brightness row
   if (hasCap(caps, "brightness")) {
-    const params = capParams(caps, "brightness");
-    const range = params?.range;
     const row = document.createElement("div");
     row.className = "state-row";
-    row.innerHTML = `<span class="state-label">Brightness</span><span class="state-value">${range ? `${range.min}–${range.max}%` : "supported"}</span>`;
+    const label = document.createElement("span");
+    label.className = "state-label";
+    label.textContent = "Brightness";
+    brightnessValue = document.createElement("span");
+    brightnessValue.className = "state-value";
+    brightnessValue.textContent = "…";
+    row.append(label, brightnessValue);
     card.appendChild(row);
   }
 
-  // Color temperature range info
+  // Color temperature row
   if (hasCap(caps, "colorTemperatureK")) {
-    const params = capParams(caps, "colorTemperatureK");
-    const range = params?.range;
     const row = document.createElement("div");
     row.className = "state-row";
-    row.innerHTML = `<span class="state-label">Color temp</span><span class="state-value">${range ? `${range.min}–${range.max}K` : "supported"}</span>`;
+    const label = document.createElement("span");
+    label.className = "state-label";
+    label.textContent = "Color temp";
+    tempValue = document.createElement("span");
+    tempValue.className = "state-value";
+    tempValue.textContent = "…";
+    row.append(label, tempValue);
     card.appendChild(row);
   }
 
-  return card;
+  function updateState(stateCaps) {
+    const stateFor = (instance) => {
+      const cap = stateCaps.find((c) => c.instance === instance);
+      return cap?.state?.value ?? null;
+    };
+
+    const colorVal = stateFor("colorRgb");
+    if (colorVal !== null && swatch) {
+      const hex = intToHex(colorVal);
+      swatch.style.backgroundColor = hex;
+      swatch.title = hex;
+      swatchHex.textContent = hex;
+      colorPicker.value = hex;
+    } else if (swatch) {
+      swatch.style.backgroundColor = "#444";
+      swatchHex.textContent = "unknown";
+    }
+
+    const bVal = stateFor("brightness");
+    if (brightnessValue) brightnessValue.textContent = bVal !== null ? `${bVal}%` : "—";
+
+    const tVal = stateFor("colorTemperatureK");
+    if (tempValue) tempValue.textContent = tVal !== null ? `${tVal}K` : "—";
+  }
+
+  return { card, updateState };
 }
 
 refreshBtn.addEventListener("click", loadDevices);

@@ -64,8 +64,29 @@ async function goveeGetDevices(apiKey) {
     throw new Error(body.message || `HTTP ${res.status}`);
   }
   const body = await res.json();
-  fs.writeFileSync("/tmp/govee-devices.json", JSON.stringify(body.data, null, 2));
+  fs.writeFileSync(
+    "/tmp/govee-devices.json",
+    JSON.stringify(body.data, null, 2),
+  );
   return body.data.filter((d) => d.type === "devices.types.light");
+}
+
+async function goveeGetDeviceState(apiKey, device, sku) {
+  const res = await fetch(`${GOVEE_BASE}/device/state`, {
+    method: "POST",
+    headers: { "Govee-API-Key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      requestId: crypto.randomUUID(),
+      payload: { sku, device },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message || `HTTP ${res.status}`);
+  }
+  const body = await res.json();
+  fs.writeFileSync("/tmp/govee-state.json", JSON.stringify(body.payload.capabilities, null, 2));
+  return body.payload.capabilities;
 }
 
 async function goveeSetColor(apiKey, device, model, r, g, b) {
@@ -135,6 +156,16 @@ function registerIpcHandlers() {
       const key = getApiKey();
       await goveeSetColor(key, device, model, r, g, b);
       return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("govee:get-device-state", async (_e, { device, sku }) => {
+    try {
+      const key = getApiKey();
+      const capabilities = await goveeGetDeviceState(key, device, sku);
+      return { ok: true, capabilities };
     } catch (err) {
       return { ok: false, error: err.message };
     }
