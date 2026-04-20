@@ -106,13 +106,18 @@ async function loadDevices() {
     return;
   }
 
-  const cards = res.devices.map((device) => {
-    const { card, updateState } = renderDeviceCard(device);
+  // Load saved segment colors for all devices from local store
+  const savedSegments = await Promise.all(
+    res.devices.map((d) => window.govee.getDeviceSegments(d.device))
+  );
+
+  const cards = res.devices.map((device, i) => {
+    const { card, updateState } = renderDeviceCard(device, savedSegments[i].segments);
     deviceContainer.appendChild(card);
     return { device, updateState };
   });
 
-  // Fetch live state for each device in parallel
+  // Fetch live API state per device in parallel
   cards.forEach(async ({ device, updateState }) => {
     const stateRes = await window.govee.getDeviceState(device.device, device.sku);
     if (stateRes.ok) updateState(stateRes.capabilities);
@@ -142,7 +147,14 @@ function intToHex(int) {
   return rgbToHex(r, g, b);
 }
 
-function renderDeviceCard(device) {
+function getSegmentCount(capabilities) {
+  const cap = capabilities.find((c) => c.instance === "segmentedColorRgb");
+  if (!cap) return null;
+  const segField = cap.parameters?.fields?.find((f) => f.fieldName === "segment");
+  return segField ? segField.elementRange.max + 1 : null;
+}
+
+function renderDeviceCard(device, savedSegments) {
   const caps = device.capabilities || [];
   const supportedCaps = caps.filter((c) => SUPPORTED_CAPABILITIES.includes(c.instance));
 
@@ -263,6 +275,70 @@ function renderDeviceCard(device) {
     tempValue.textContent = "…";
     row.append(label, tempValue);
     card.appendChild(row);
+  }
+
+  // Segment editor
+  const segmentCount = getSegmentCount(caps);
+  if (segmentCount !== null) {
+    const segmentColors = savedSegments && savedSegments.length === segmentCount
+      ? [...savedSegments]
+      : Array(segmentCount).fill("#ffffff");
+
+    const segEditor = document.createElement("div");
+    segEditor.className = "seg-editor";
+
+    const segHeader = document.createElement("div");
+    segHeader.className = "state-row";
+    segHeader.innerHTML = `<span class="state-label">Segments</span><span class="state-value">${segmentCount} zones</span>`;
+
+    const strip = document.createElement("div");
+    strip.className = "seg-strip";
+
+    segmentColors.forEach((color, idx) => {
+      const label = document.createElement("label");
+      label.className = "seg-box";
+      label.style.backgroundColor = color;
+      label.title = `Segment ${idx + 1}`;
+
+      const input = document.createElement("input");
+      input.type = "color";
+      input.value = color;
+      input.className = "seg-input";
+      input.addEventListener("input", () => {
+        segmentColors[idx] = input.value;
+        label.style.backgroundColor = input.value;
+      });
+
+      label.appendChild(input);
+      strip.appendChild(label);
+    });
+
+    const applySegBtn = document.createElement("button");
+    applySegBtn.className = "apply-color-btn";
+    applySegBtn.textContent = "Apply Segments";
+
+    const segStatus = document.createElement("p");
+    segStatus.className = "card-status";
+
+    applySegBtn.addEventListener("click", async () => {
+      applySegBtn.disabled = true;
+      segStatus.className = "card-status";
+      segStatus.textContent = "Sending…";
+
+      const res = await window.govee.setSegmentColors(device.device, device.sku, segmentColors);
+      applySegBtn.disabled = false;
+
+      if (res.ok) {
+        segStatus.textContent = "Applied!";
+        setTimeout(() => { segStatus.textContent = ""; }, 2000);
+      } else {
+        segStatus.className = "card-status err";
+        segStatus.textContent = res.error || "Error";
+      }
+    });
+
+    segEditor.append(segHeader, strip, applySegBtn, segStatus);
+    card.appendChild(segEditor);
   }
 
   function updateState(stateCaps) {

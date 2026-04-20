@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld("govee", {
   saveApiKey: (key) => ipcRenderer.invoke("govee:save-api-key", { key }),
   getDevices: () => ipcRenderer.invoke("govee:get-devices"),
   getDeviceState: (device, sku) => ipcRenderer.invoke("govee:get-device-state", { device, sku }),
+  getDeviceSegments: (device) => ipcRenderer.invoke("govee:get-device-segments", { device }),
+  setSegmentColors: (device, sku, segments) => ipcRenderer.invoke("govee:set-segment-colors", { device, sku, segments }),
   setColor: (device, model, r, g, b) =>
     ipcRenderer.invoke("govee:set-color", { device, model, r, g, b }),
   getPresets: () => ipcRenderer.invoke("govee:get-presets"),

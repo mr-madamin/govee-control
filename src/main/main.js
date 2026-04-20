@@ -51,6 +51,17 @@ function deletePreset(name) {
   writeStore(store);
 }
 
+function getDeviceSegments(device) {
+  return (readStore().deviceSegments || {})[device] || null;
+}
+
+function saveDeviceSegments(device, segments) {
+  const store = readStore();
+  store.deviceSegments = store.deviceSegments || {};
+  store.deviceSegments[device] = segments;
+  writeStore(store);
+}
+
 // ── Govee API client ──────────────────────────────────────────────────────────
 
 const GOVEE_BASE = "https://openapi.api.govee.com/router/api/v1";
@@ -85,8 +96,46 @@ async function goveeGetDeviceState(apiKey, device, sku) {
     throw new Error(body.message || `HTTP ${res.status}`);
   }
   const body = await res.json();
-  fs.writeFileSync("/tmp/govee-state.json", JSON.stringify(body.payload.capabilities, null, 2));
+  if ((body.payload.sku = "H61C3")) {
+    fs.writeFileSync(
+      "/tmp/govee-state.json",
+      JSON.stringify(body.payload, null, 2),
+    );
+  }
   return body.payload.capabilities;
+}
+
+async function goveeSetSegmentColors(apiKey, device, sku, segments) {
+  // Group segment indices by color to minimise API calls
+  const colorMap = {};
+  segments.forEach((hex, idx) => {
+    colorMap[hex] = colorMap[hex] || [];
+    colorMap[hex].push(idx);
+  });
+
+  for (const [hex, indices] of Object.entries(colorMap)) {
+    const rgb = parseInt(hex.slice(1), 16);
+    const res = await fetch(`${GOVEE_BASE}/device/control`, {
+      method: "POST",
+      headers: { "Govee-API-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requestId: crypto.randomUUID(),
+        payload: {
+          sku,
+          device,
+          capabilities: [{
+            type: "devices.capabilities.segment_color_setting",
+            instance: "segmentedColorRgb",
+            value: { segment: indices, rgb },
+          }],
+        },
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `HTTP ${res.status}`);
+    }
+  }
 }
 
 async function goveeSetColor(apiKey, device, model, r, g, b) {
@@ -166,6 +215,21 @@ function registerIpcHandlers() {
       const key = getApiKey();
       const capabilities = await goveeGetDeviceState(key, device, sku);
       return { ok: true, capabilities };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("govee:get-device-segments", (_e, { device }) => {
+    return { ok: true, segments: getDeviceSegments(device) };
+  });
+
+  ipcMain.handle("govee:set-segment-colors", async (_e, { device, sku, segments }) => {
+    try {
+      const key = getApiKey();
+      await goveeSetSegmentColors(key, device, sku, segments);
+      saveDeviceSegments(device, segments);
+      return { ok: true };
     } catch (err) {
       return { ok: false, error: err.message };
     }
